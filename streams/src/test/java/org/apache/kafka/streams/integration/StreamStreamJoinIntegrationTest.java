@@ -16,20 +16,14 @@
  */
 package org.apache.kafka.streams.integration;
 
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.KafkaStreams.State;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.errors.InvalidStateStoreException;
-import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.JoinWindows;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.StreamJoined;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.test.TestRecord;
 import org.apache.kafka.test.IntegrationTest;
 import org.apache.kafka.test.MockMapper;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -39,11 +33,8 @@ import org.junit.runners.Parameterized;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 
-import static java.time.Duration.ofMillis;
 import static java.time.Duration.ofSeconds;
-import static org.junit.Assert.assertThrows;
 
 /**
  * Tests all available joins of Kafka Streams DSL.
@@ -70,35 +61,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void shouldNotAccessJoinStoresWhenGivingName() throws InterruptedException {
-        STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-no-store-access");
-        final StreamsBuilder builder = new StreamsBuilder();
-
-        final KStream<String, Integer> left = builder.stream(INPUT_TOPIC_LEFT, Consumed.with(Serdes.String(), Serdes.Integer()));
-        final KStream<String, Integer> right = builder.stream(INPUT_TOPIC_RIGHT, Consumed.with(Serdes.String(), Serdes.Integer()));
-        final CountDownLatch latch = new CountDownLatch(1);
-
-        left.join(
-            right,
-            (value1, value2) -> value1 + value2,
-            JoinWindows.of(ofMillis(100)),
-            StreamJoined.with(Serdes.String(), Serdes.Integer(), Serdes.Integer()).withStoreName("join-store"));
-
-        try (final KafkaStreams kafkaStreams = new KafkaStreams(builder.build(), STREAMS_CONFIG)) {
-            kafkaStreams.setStateListener((newState, oldState) -> {
-                if (newState == State.RUNNING) {
-                    latch.countDown();
-                }
-            });
-
-            kafkaStreams.start();
-            latch.await();
-            assertThrows(InvalidStateStoreException.class, () -> kafkaStreams.store("join-store", QueryableStoreTypes.keyValueStore()));
-        }
-    }
-
-    @Test
-    public void testInner() throws Exception {
+    public void testInner() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-inner");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -139,7 +102,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testInnerRepartitioned() throws Exception {
+    public void testInnerRepartitioned() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-inner-repartitioned");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -183,7 +146,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testLeft() throws Exception {
+    public void testLeft() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-left");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -224,7 +187,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testLeftRepartitioned() throws Exception {
+    public void testLeftRepartitioned() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-left-repartitioned");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -268,7 +231,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testOuter() throws Exception {
+    public void testOuter() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-outer");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -309,7 +272,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testOuterRepartitioned() throws Exception {
+    public void testOuterRepartitioned() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-outer");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(
@@ -353,7 +316,7 @@ public class StreamStreamJoinIntegrationTest extends AbstractJoinIntegrationTest
     }
 
     @Test
-    public void testMultiInner() throws Exception {
+    public void testMultiInner() {
         STREAMS_CONFIG.put(StreamsConfig.APPLICATION_ID_CONFIG, appID + "-multi-inner");
 
         final List<List<TestRecord<Long, String>>> expectedResult = Arrays.asList(

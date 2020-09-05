@@ -20,6 +20,7 @@ package org.apache.kafka.clients.admin;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -36,6 +37,8 @@ import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclBindingFilter;
 import org.apache.kafka.common.annotation.InterfaceStability;
 import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.quota.ClientQuotaAlteration;
+import org.apache.kafka.common.quota.ClientQuotaFilter;
 import org.apache.kafka.common.requests.LeaveGroupResponse;
 
 /**
@@ -408,7 +411,6 @@ public interface Admin extends AutoCloseable {
         return incrementalAlterConfigs(configs, new AlterConfigsOptions());
     }
 
-
     /**
      * Incrementally update the configuration for the specified resources.
      * <p>
@@ -422,6 +424,8 @@ public interface Admin extends AutoCloseable {
      * if the authenticated user didn't have alter access to the cluster.</li>
      * <li>{@link org.apache.kafka.common.errors.TopicAuthorizationException}
      * if the authenticated user didn't have alter access to the Topic.</li>
+     * <li>{@link org.apache.kafka.common.errors.UnknownTopicOrPartitionException}
+     * if the Topic doesn't exist.</li>
      * <li>{@link org.apache.kafka.common.errors.InvalidRequestException}
      * if the request details are invalid. e.g., a configuration key was specified more than once for a resource</li>
      * </ul>
@@ -990,7 +994,7 @@ public interface Admin extends AutoCloseable {
      *   If there was an attempt to cancel a reassignment for a partition which was not being reassigned.</li>
      * </ul>
      *
-     * @param reassignments   The reassignments to add, modify, or remove.
+     * @param reassignments   The reassignments to add, modify, or remove. See {@link NewPartitionReassignment}.
      * @param options         The options to use.
      * @return                The result.
      */
@@ -1131,6 +1135,176 @@ public interface Admin extends AutoCloseable {
      * @return The ListOffsetsResult.
      */
     ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets, ListOffsetsOptions options);
+
+    /**
+     * Describes all entities matching the provided filter that have at least one client quota configuration
+     * value defined.
+     * <p>
+     * This is a convenience method for {@link #describeClientQuotas(ClientQuotaFilter, DescribeClientQuotasOptions)}
+     * with default options. See the overload for more details.
+     * <p>
+     * This operation is supported by brokers with version 2.6.0 or higher.
+     *
+     * @param filter the filter to apply to match entities
+     * @return the DescribeClientQuotasResult containing the result
+     */
+    default DescribeClientQuotasResult describeClientQuotas(ClientQuotaFilter filter) {
+        return describeClientQuotas(filter, new DescribeClientQuotasOptions());
+    }
+
+    /**
+     * Describes all entities matching the provided filter that have at least one client quota configuration
+     * value defined.
+     * <p>
+     * The following exceptions can be anticipated when calling {@code get()} on the future from the
+     * returned {@link DescribeClientQuotasResult}:
+     * <ul>
+     *   <li>{@link org.apache.kafka.common.errors.ClusterAuthorizationException}
+     *   If the authenticated user didn't have describe access to the cluster.</li>
+     *   <li>{@link org.apache.kafka.common.errors.InvalidRequestException}
+     *   If the request details are invalid. e.g., an invalid entity type was specified.</li>
+     *   <li>{@link org.apache.kafka.common.errors.TimeoutException}
+     *   If the request timed out before the describe could finish.</li>
+     * </ul>
+     * <p>
+     * This operation is supported by brokers with version 2.6.0 or higher.
+     *
+     * @param filter the filter to apply to match entities
+     * @param options the options to use
+     * @return the DescribeClientQuotasResult containing the result
+     */
+    DescribeClientQuotasResult describeClientQuotas(ClientQuotaFilter filter, DescribeClientQuotasOptions options);
+
+    /**
+     * Alters client quota configurations with the specified alterations.
+     * <p>
+     * This is a convenience method for {@link #alterClientQuotas(Collection, AlterClientQuotasOptions)}
+     * with default options. See the overload for more details.
+     * <p>
+     * This operation is supported by brokers with version 2.6.0 or higher.
+     *
+     * @param entries the alterations to perform
+     * @return the AlterClientQuotasResult containing the result
+     */
+    default AlterClientQuotasResult alterClientQuotas(Collection<ClientQuotaAlteration> entries) {
+        return alterClientQuotas(entries, new AlterClientQuotasOptions());
+    }
+
+    /**
+     * Alters client quota configurations with the specified alterations.
+     * <p>
+     * Alterations for a single entity are atomic, but across entities is not guaranteed. The resulting
+     * per-entity error code should be evaluated to resolve the success or failure of all updates.
+     * <p>
+     * The following exceptions can be anticipated when calling {@code get()} on the futures obtained from
+     * the returned {@link AlterClientQuotasResult}:
+     * <ul>
+     *   <li>{@link org.apache.kafka.common.errors.ClusterAuthorizationException}
+     *   If the authenticated user didn't have alter access to the cluster.</li>
+     *   <li>{@link org.apache.kafka.common.errors.InvalidRequestException}
+     *   If the request details are invalid. e.g., a configuration key was specified more than once for an entity.</li>
+     *   <li>{@link org.apache.kafka.common.errors.TimeoutException}
+     *   If the request timed out before the alterations could finish. It cannot be guaranteed whether the update
+     *   succeed or not.</li>
+     * </ul>
+     * <p>
+     * This operation is supported by brokers with version 2.6.0 or higher.
+     *
+     * @param entries the alterations to perform
+     * @return the AlterClientQuotasResult containing the result
+     */
+    AlterClientQuotasResult alterClientQuotas(Collection<ClientQuotaAlteration> entries, AlterClientQuotasOptions options);
+
+    /**
+     * Describe all SASL/SCRAM credentials.
+     *
+     * <p>This is a convenience method for {@link #describeUserScramCredentials(List, DescribeUserScramCredentialsOptions)}
+     *
+     * @return The DescribeUserScramCredentialsResult.
+     */
+    default DescribeUserScramCredentialsResult describeUserScramCredentials() {
+        return describeUserScramCredentials(null, new DescribeUserScramCredentialsOptions());
+    }
+
+    /**
+     * Describe SASL/SCRAM credentials for the given users.
+     *
+     * <p>This is a convenience method for {@link #describeUserScramCredentials(List, DescribeUserScramCredentialsOptions)}
+     *
+     * @param users the users for which credentials are to be described; all users' credentials are described if null
+     *              or empty.
+     * @return The DescribeUserScramCredentialsResult.
+     */
+    default DescribeUserScramCredentialsResult describeUserScramCredentials(List<String> users) {
+        return describeUserScramCredentials(users, new DescribeUserScramCredentialsOptions());
+    }
+
+    /**
+     * Describe SASL/SCRAM credentials.
+     * <p>
+     * The following exceptions can be anticipated when calling {@code get()} on the futures from the
+     * returned {@link DescribeUserScramCredentialsResult}:
+     * <ul>
+     *   <li>{@link org.apache.kafka.common.errors.ClusterAuthorizationException}
+     *   If the authenticated user didn't have describe access to the cluster.</li>
+     *   <li>{@link org.apache.kafka.common.errors.ResourceNotFoundException}
+     *   If the user did not exist/had no SCRAM credentials.</li>
+     *   <li>{@link org.apache.kafka.common.errors.DuplicateResourceException}
+     *   If the user was requested to be described more than once in the original request.</li>
+     *   <li>{@link org.apache.kafka.common.errors.TimeoutException}
+     *   If the request timed out before the describe operation could finish.</li>
+     * </ul>
+     * <p>
+     * This operation is supported by brokers with version 2.7.0 or higher.
+     *
+     * @param users the users for which credentials are to be described; all users' credentials are described if null
+     *              or empty.
+     * @param options The options to use when describing the credentials
+     * @return The DescribeUserScramCredentialsResult.
+     */
+    DescribeUserScramCredentialsResult describeUserScramCredentials(List<String> users, DescribeUserScramCredentialsOptions options);
+
+    /**
+     * Alter SASL/SCRAM credentials for the given users.
+     *
+     * <p>This is a convenience method for {@link #alterUserScramCredentials(List, AlterUserScramCredentialsOptions)}
+     *
+     * @param alterations the alterations to be applied
+     * @return The AlterUserScramCredentialsResult.
+     */
+    default AlterUserScramCredentialsResult alterUserScramCredentials(List<UserScramCredentialAlteration> alterations) {
+        return alterUserScramCredentials(alterations, new AlterUserScramCredentialsOptions());
+    }
+
+    /**
+     * Alter SASL/SCRAM credentials.
+     *
+     * <p>
+     * The following exceptions can be anticipated when calling {@code get()} any of the futures from the
+     * returned {@link AlterUserScramCredentialsResult}:
+     * <ul>
+     *   <li>{@link org.apache.kafka.common.errors.NotControllerException}
+     *   If the request is not sent to the Controller broker.</li>
+     *   <li>{@link org.apache.kafka.common.errors.ClusterAuthorizationException}
+     *   If the authenticated user didn't have alter access to the cluster.</li>
+     *   <li>{@link org.apache.kafka.common.errors.UnsupportedByAuthenticationException}
+     *   If the user authenticated with a delegation token.</li>
+     *   <li>{@link org.apache.kafka.common.errors.UnsupportedSaslMechanismException}
+     *   If the requested SCRAM mechanism is unrecognized or otherwise unsupported.</li>
+     *   <li>{@link org.apache.kafka.common.errors.UnacceptableCredentialException}
+     *   If the username is empty or the requested number of iterations is too small or too large.</li>
+     *   <li>{@link org.apache.kafka.common.errors.TimeoutException}
+     *   If the request timed out before the describe could finish.</li>
+     * </ul>
+     * <p>
+     * This operation is supported by brokers with version 2.7.0 or higher.
+     *
+     * @param alterations the alterations to be applied
+     * @param options The options to use when altering the credentials
+     * @return The AlterUserScramCredentialsResult.
+     */
+    AlterUserScramCredentialsResult alterUserScramCredentials(List<UserScramCredentialAlteration> alterations,
+                                                              AlterUserScramCredentialsOptions options);
 
     /**
      * Get the metrics kept by the adminClient

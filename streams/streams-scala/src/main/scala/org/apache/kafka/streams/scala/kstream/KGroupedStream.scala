@@ -21,6 +21,7 @@ package org.apache.kafka.streams.scala
 package kstream
 
 import org.apache.kafka.streams.kstream.internals.KTableImpl
+import org.apache.kafka.streams.scala.serialization.Serdes
 import org.apache.kafka.streams.kstream.{
   SessionWindows,
   Window,
@@ -63,7 +64,7 @@ class KGroupedStream[K, V](val inner: KGroupedStreamJ[K, V]) {
     new KTable(
       javaCountTable.mapValues[Long](
         ((l: java.lang.Long) => Long2long(l)).asValueMapper,
-        Materialized.`with`[K, Long, ByteArrayKeyValueStore](tableImpl.keySerde(), Serdes.Long)
+        Materialized.`with`[K, Long, ByteArrayKeyValueStore](tableImpl.keySerde(), Serdes.longSerde)
       )
     )
   }
@@ -78,8 +79,6 @@ class KGroupedStream[K, V](val inner: KGroupedStreamJ[K, V]) {
    * @see `org.apache.kafka.streams.kstream.KGroupedStream#reduce`
    */
   def reduce(reducer: (V, V) => V)(implicit materialized: Materialized[K, V, ByteArrayKeyValueStore]): KTable[K, V] =
-    // need this explicit asReducer for Scala 2.11 or else the SAM conversion doesn't take place
-    // works perfectly with Scala 2.12 though
     new KTable(inner.reduce(reducer.asReducer, materialized))
 
   /**
@@ -116,5 +115,15 @@ class KGroupedStream[K, V](val inner: KGroupedStreamJ[K, V]) {
    */
   def windowedBy(windows: SessionWindows): SessionWindowedKStream[K, V] =
     new SessionWindowedKStream(inner.windowedBy(windows))
+
+  /**
+   * Create a new [[CogroupedKStream]] from this grouped KStream to allow cogrouping other [[KGroupedStream]] to it.
+   *
+   * @param aggregator an `Aggregator` that computes a new aggregate result
+   * @return an instance of [[CogroupedKStream]]
+   * @see `org.apache.kafka.streams.kstream.KGroupedStream#cogroup`
+   */
+  def cogroup[VR](aggregator: (K, V, VR) => VR): CogroupedKStream[K, VR] =
+    new CogroupedKStream(inner.cogroup(aggregator.asAggregator))
 
 }

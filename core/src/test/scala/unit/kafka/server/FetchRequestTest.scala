@@ -33,7 +33,7 @@ import org.apache.kafka.common.{IsolationLevel, TopicPartition}
 import org.junit.Assert._
 import org.junit.Test
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.Seq
 import scala.util.Random
 
@@ -209,7 +209,7 @@ class FetchRequestTest extends BaseRequestTest {
       Seq(topicPartition))).build()
     val fetchResponse = sendFetchRequest(nonReplicaId, fetchRequest)
     val partitionData = fetchResponse.responseData.get(topicPartition)
-    assertEquals(Errors.REPLICA_NOT_AVAILABLE, partitionData.error)
+    assertEquals(Errors.NOT_LEADER_OR_FOLLOWER, partitionData.error)
   }
 
   @Test
@@ -246,6 +246,55 @@ class FetchRequestTest extends BaseRequestTest {
     assertResponseErrorForEpoch(Errors.NONE, followerId, Optional.of(secondLeaderEpoch))
     assertResponseErrorForEpoch(Errors.UNKNOWN_LEADER_EPOCH, followerId, Optional.of(secondLeaderEpoch + 1))
     assertResponseErrorForEpoch(Errors.FENCED_LEADER_EPOCH, followerId, Optional.of(secondLeaderEpoch - 1))
+  }
+
+  @Test
+  def testEpochValidationWithinFetchSession(): Unit = {
+    val topic = "topic"
+    val topicPartition = new TopicPartition(topic, 0)
+    val partitionToLeader = TestUtils.createTopic(zkClient, topic, numPartitions = 1, replicationFactor = 3, servers)
+    val firstLeaderId = partitionToLeader(topicPartition.partition)
+
+    // We need a leader change in order to check epoch fencing since the first epoch is 0 and
+    // -1 is treated as having no epoch at all
+    killBroker(firstLeaderId)
+
+    val secondLeaderId = TestUtils.awaitLeaderChange(servers, topicPartition, firstLeaderId)
+    val secondLeaderEpoch = TestUtils.findLeaderEpoch(secondLeaderId, topicPartition, servers)
+    verifyFetchSessionErrors(topicPartition, secondLeaderEpoch, secondLeaderId)
+
+    val followerId = TestUtils.findFollowerId(topicPartition, servers)
+    verifyFetchSessionErrors(topicPartition, secondLeaderEpoch, followerId)
+  }
+
+  private def verifyFetchSessionErrors(topicPartition: TopicPartition,
+                                       leaderEpoch: Int,
+                                       destinationBrokerId: Int): Unit = {
+    val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
+    partitionMap.put(topicPartition, new FetchRequest.PartitionData(0L, 0L, 1024,
+      Optional.of(leaderEpoch)))
+    val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap)
+      .metadata(JFetchMetadata.INITIAL)
+      .build()
+    val fetchResponse = sendFetchRequest(destinationBrokerId, fetchRequest)
+    val sessionId = fetchResponse.sessionId
+
+    def assertResponseErrorForEpoch(expectedError: Errors,
+                                    sessionFetchEpoch: Int,
+                                    leaderEpoch: Optional[Integer]): Unit = {
+      val partitionMap = new util.LinkedHashMap[TopicPartition, FetchRequest.PartitionData]
+      partitionMap.put(topicPartition, new FetchRequest.PartitionData(0L, 0L, 1024, leaderEpoch))
+      val fetchRequest = FetchRequest.Builder.forConsumer(0, 1, partitionMap)
+        .metadata(new JFetchMetadata(sessionId, sessionFetchEpoch))
+        .build()
+      val fetchResponse = sendFetchRequest(destinationBrokerId, fetchRequest)
+      val partitionData = fetchResponse.responseData.get(topicPartition)
+      assertEquals(expectedError, partitionData.error)
+    }
+
+    // We only check errors because we do not expect the partition in the response otherwise
+    assertResponseErrorForEpoch(Errors.FENCED_LEADER_EPOCH, 1, Optional.of(leaderEpoch - 1))
+    assertResponseErrorForEpoch(Errors.UNKNOWN_LEADER_EPOCH, 2, Optional.of(leaderEpoch + 1))
   }
 
   /**
@@ -484,6 +533,12 @@ class FetchRequestTest extends BaseRequestTest {
   }
 
   @Test
+  def testPartitionDataEquals(): Unit = {
+    assertEquals(new FetchRequest.PartitionData(300, 0L, 300, Optional.of(300)),
+    new FetchRequest.PartitionData(300, 0L, 300, Optional.of(300)));
+  }
+
+  @Test
   def testZStdCompressedRecords(): Unit = {
     // Producer compressed topic
     val topicConfig = Map(LogConfig.CompressionTypeProp -> ProducerCompressionCodec.name,
@@ -514,7 +569,8 @@ class FetchRequestTest extends BaseRequestTest {
     // zstd compressed record raises UNSUPPORTED_COMPRESSION_TYPE error.
     val req0 = new FetchRequest.Builder(0, 1, -1, Int.MaxValue, 0,
       createPartitionMap(300, Seq(topicPartition), Map.empty))
-      .setMaxBytes(800).build()
+      .setMaxBytes(800)
+      .build()
 
     val res0 = sendFetchRequest(leaderId, req0)
     val data0 = res0.responseData.get(topicPartition)

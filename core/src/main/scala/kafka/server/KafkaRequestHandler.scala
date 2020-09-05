@@ -28,7 +28,7 @@ import org.apache.kafka.common.internals.FatalExitError
 import org.apache.kafka.common.utils.{KafkaThread, Time}
 
 import scala.collection.mutable
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * A thread that answers kafka requests.
@@ -282,7 +282,7 @@ object BrokerTopicStats {
   private val valueFactory = (k: String) => new BrokerTopicMetrics(Some(k))
 }
 
-class BrokerTopicStats {
+class BrokerTopicStats extends Logging {
   import BrokerTopicStats._
 
   private val stats = new Pool[String, BrokerTopicMetrics](Some(valueFactory))
@@ -359,6 +359,7 @@ class BrokerTopicStats {
   def close(): Unit = {
     allTopicsStats.close()
     stats.values.foreach(_.close())
-  }
 
+    info("Broker and topic stats closed")
+  }
 }

@@ -65,7 +65,7 @@ public class KTableMapValuesTest {
             assertEquals(asList(new KeyValueTimestamp<>("A", 1, 5),
                     new KeyValueTimestamp<>("B", 2, 25),
                     new KeyValueTimestamp<>("C", 3, 20),
-                    new KeyValueTimestamp<>("D", 4, 10)), supplier.theCapturedProcessor().processed);
+                    new KeyValueTimestamp<>("D", 4, 10)), supplier.theCapturedProcessor().processed());
         }
     }
 
@@ -180,7 +180,7 @@ public class KTableMapValuesTest {
             (KTableImpl<String, String, String>) builder.table(topic1, consumed);
         final KTableImpl<String, String, Integer> table2 =
             (KTableImpl<String, String, Integer>) table1.mapValues(
-                Integer::new,
+                s -> Integer.valueOf(s),
                 Materialized.<String, Integer, KeyValueStore<Bytes, byte[]>>as(storeName2)
                     .withValueSerde(Serdes.Integer()));
         final KTableImpl<String, String, Integer> table3 =
@@ -189,7 +189,7 @@ public class KTableMapValuesTest {
                 Materialized.<String, Integer, KeyValueStore<Bytes, byte[]>>as(storeName3)
                     .withValueSerde(Serdes.Integer()));
         final KTableImpl<String, String, Integer> table4 =
-            (KTableImpl<String, String, Integer>) table1.mapValues(Integer::new);
+            (KTableImpl<String, String, Integer>) table1.mapValues(s -> Integer.valueOf(s));
 
         assertEquals(storeName2, table2.queryableStoreName());
         assertEquals(storeName3, table3.queryableStoreName());
@@ -206,7 +206,7 @@ public class KTableMapValuesTest {
         final KTableImpl<String, String, String> table1 =
             (KTableImpl<String, String, String>) builder.table(topic1, consumed);
         final KTableImpl<String, String, Integer> table2 =
-            (KTableImpl<String, String, Integer>) table1.mapValues(Integer::new);
+            (KTableImpl<String, String, Integer>) table1.mapValues(s -> Integer.valueOf(s));
 
         final MockProcessorSupplier<String, Integer> supplier = new MockProcessorSupplier<>();
         final Topology topology = builder.build().addProcessor("proc", supplier, table2.name);
@@ -247,7 +247,7 @@ public class KTableMapValuesTest {
         final KTableImpl<String, String, String> table1 =
             (KTableImpl<String, String, String>) builder.table(topic1, consumed);
         final KTableImpl<String, String, Integer> table2 =
-            (KTableImpl<String, String, Integer>) table1.mapValues(Integer::new);
+            (KTableImpl<String, String, Integer>) table1.mapValues(s -> Integer.valueOf(s));
         table2.enableSendingOldValues();
 
         final MockProcessorSupplier<String, Integer> supplier = new MockProcessorSupplier<>();

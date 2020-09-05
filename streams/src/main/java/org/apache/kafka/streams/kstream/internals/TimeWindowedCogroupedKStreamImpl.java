@@ -17,10 +17,6 @@
 
 package org.apache.kafka.streams.kstream.internals;
 
-import java.time.Duration;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.kstream.Aggregator;
 import org.apache.kafka.streams.kstream.Initializer;
@@ -39,8 +35,13 @@ import org.apache.kafka.streams.state.WindowBytesStoreSupplier;
 import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.internals.RocksDbWindowBytesStoreSupplier;
 
+import java.time.Duration;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
 public class TimeWindowedCogroupedKStreamImpl<K, V, W extends Window> extends AbstractStream<K, V>
-        implements TimeWindowedCogroupedKStream<K, V> {
+    implements TimeWindowedCogroupedKStream<K, V> {
 
     private final Windows<W> windows;
     private final CogroupedStreamAggregateBuilder<K, V> aggregateBuilder;
@@ -48,12 +49,12 @@ public class TimeWindowedCogroupedKStreamImpl<K, V, W extends Window> extends Ab
 
     TimeWindowedCogroupedKStreamImpl(final Windows<W> windows,
                                      final InternalStreamsBuilder builder,
-                                     final Set<String> sourceNodes,
+                                     final Set<String> subTopologySourceNodes,
                                      final String name,
                                      final CogroupedStreamAggregateBuilder<K, V> aggregateBuilder,
                                      final StreamsGraphNode streamsGraphNode,
                                      final Map<KGroupedStreamImpl<K, ?>, Aggregator<? super K, ? super Object, V>> groupPatterns) {
-        super(name, null, null, sourceNodes, streamsGraphNode, builder);
+        super(name, null, null, subTopologySourceNodes, streamsGraphNode, builder);
         //keySerde and valueSerde are null because there are many different groupStreams that they could be from
         this.windows = windows;
         this.aggregateBuilder = aggregateBuilder;
@@ -95,19 +96,17 @@ public class TimeWindowedCogroupedKStreamImpl<K, V, W extends Window> extends Ab
             new NamedInternal(named),
             materialize(materializedInternal),
             materializedInternal.keySerde() != null ?
-                    new FullTimeWindowedSerde<>(materializedInternal.keySerde(), windows.size())
-                    : null,
+                new FullTimeWindowedSerde<>(materializedInternal.keySerde(), windows.size())
+                : null,
             materializedInternal.valueSerde(),
             materializedInternal.queryableStoreName(),
-            windows,
-            null,
-            null);
+            windows);
     }
 
     @SuppressWarnings("deprecation")
     // continuing to support Windows#maintainMs/segmentInterval in fallback mode
     private StoreBuilder<TimestampedWindowStore<K, V>> materialize(
-            final MaterializedInternal<K, V, WindowStore<Bytes, byte[]>> materialized) {
+        final MaterializedInternal<K, V, WindowStore<Bytes, byte[]>> materialized) {
         WindowBytesStoreSupplier supplier = (WindowBytesStoreSupplier) materialized.storeSupplier();
         if (supplier == null) {
             if (materialized.retention() != null) {
@@ -116,13 +115,13 @@ public class TimeWindowedCogroupedKStreamImpl<K, V, W extends Window> extends Ab
 
                 if ((windows.size() + windows.gracePeriodMs()) > retentionPeriod) {
                     throw new IllegalArgumentException("The retention period of the window store "
-                                                       + name
-                                                       + " must be no smaller than its window size plus the grace period."
-                                                       + " Got size=[" + windows.size() + "],"
-                                                       + " grace=[" + windows.gracePeriodMs()
-                                                       + "],"
-                                                       + " retention=[" + retentionPeriod
-                                                       + "]");
+                        + name
+                        + " must be no smaller than its window size plus the grace period."
+                        + " Got size=[" + windows.size() + "],"
+                        + " grace=[" + windows.gracePeriodMs()
+                        + "],"
+                        + " retention=[" + retentionPeriod
+                        + "]");
                 }
 
                 supplier = Stores.persistentTimestampedWindowStore(
@@ -140,13 +139,13 @@ public class TimeWindowedCogroupedKStreamImpl<K, V, W extends Window> extends Ab
 
                 if ((windows.size() + windows.gracePeriodMs()) > windows.maintainMs()) {
                     throw new IllegalArgumentException("The retention period of the window store "
-                                                       + name
-                                                       + " must be no smaller than its window size plus the grace period."
-                                                       + " Got size=[" + windows.size() + "],"
-                                                       + " grace=[" + windows.gracePeriodMs()
-                                                       + "],"
-                                                       + " retention=[" + windows.maintainMs()
-                                                       + "]");
+                        + name
+                        + " must be no smaller than its window size plus the grace period."
+                        + " Got size=[" + windows.size() + "],"
+                        + " grace=[" + windows.gracePeriodMs()
+                        + "],"
+                        + " retention=[" + windows.maintainMs()
+                        + "]");
                 }
 
                 supplier = new RocksDbWindowBytesStoreSupplier(

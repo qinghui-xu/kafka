@@ -82,7 +82,7 @@ final class SchemaGenerator {
     void generateSchemas(MessageSpec message) throws Exception {
         this.messageFlexibleVersions = message.flexibleVersions();
         // Generate schemas for inline structures
-        generateSchemas(message.generatedClassName(), message.struct(),
+        generateSchemas(message.dataClassName(), message.struct(),
             message.struct().versions());
 
         // Generate schemas for common structures
@@ -260,6 +260,12 @@ final class SchemaGenerator {
                 throw new RuntimeException("Type " + type + " cannot be nullable.");
             }
             return "Type.UUID";
+        } else if (type instanceof FieldType.Float64FieldType) {
+            headerGenerator.addImport(MessageGenerator.TYPE_CLASS);
+            if (nullable) {
+                throw new RuntimeException("Type " + type + " cannot be nullable.");
+            }
+            return "Type.FLOAT64";
         } else if (type instanceof FieldType.StringFieldType) {
             headerGenerator.addImport(MessageGenerator.TYPE_CLASS);
             if (fieldFlexibleVersions.contains(version)) {
@@ -273,6 +279,13 @@ final class SchemaGenerator {
                 return nullable ? "Type.COMPACT_NULLABLE_BYTES" : "Type.COMPACT_BYTES";
             } else {
                 return nullable ? "Type.NULLABLE_BYTES" : "Type.BYTES";
+            }
+        } else if (type.isRecords()) {
+            headerGenerator.addImport(MessageGenerator.TYPE_CLASS);
+            if (fieldFlexibleVersions.contains(version)) {
+                return "Type.COMPACT_RECORDS";
+            } else {
+                return "Type.RECORDS";
             }
         } else if (type.isArray()) {
             if (fieldFlexibleVersions.contains(version)) {
@@ -341,6 +354,10 @@ final class SchemaGenerator {
         }
         buffer.decrementIndent();
         buffer.printf("};%n");
+        buffer.printf("%n");
+
+        buffer.printf("public static final short LOWEST_SUPPORTED_VERSION = %d;%n", versions.lowest());
+        buffer.printf("public static final short HIGHEST_SUPPORTED_VERSION = %d;%n", versions.highest());
         buffer.printf("%n");
     }
 }
