@@ -58,7 +58,7 @@ class TopicCommandWithAdminClientTest extends KafkaServerTestHarness with Loggin
     zkConnect = zkConnect,
     rackInfo = Map(0 -> "rack1", 1 -> "rack2", 2 -> "rack2", 3 -> "rack1", 4 -> "rack3", 5 -> "rack3"),
     numPartitions = numPartitions,
-    defaultReplicationFactor = defaultReplicationFactor,
+    defaultReplicationFactor = defaultReplicationFactor
   ).map { props =>
     props.put(KafkaConfig.ReplicaFetchMaxBytesProp, "1")
     KafkaConfig.fromProps(props)

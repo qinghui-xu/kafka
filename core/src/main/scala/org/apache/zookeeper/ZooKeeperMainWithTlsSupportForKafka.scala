@@ -70,7 +70,7 @@ class ZooKeeperMainWithTlsSupportForKafka(args: Array[String], val zkClientConfi
 
   def kafkaTlsUsage(): Unit = {
     System.err.println("ZooKeeper -server host:port [-zk-tls-config-file <file>] cmd args")
-    asScalaSet(ZooKeeperMain.commandMap.keySet).toList.sorted.foreach(cmd =>
+    ZooKeeperMain.commandMap.keySet.asScala.toList.sorted.foreach(cmd =>
       System.err.println(s"\t$cmd ${ZooKeeperMain.commandMap.get(cmd)}"))
   }
 
